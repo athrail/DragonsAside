@@ -1,14 +1,19 @@
-#include "SDL3/SDL_blendmode.h"
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_blendmode.h>
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_render.h>
 
+#include <SDL3_ttf/SDL_ttf.h>
+
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
-#include <exception>
+#include <filesystem>
+#include <queue>
+#include <random>
 #include <vector>
 
 enum struct TileType { None = 0, Equipment, Dragon, Road };
@@ -19,6 +24,12 @@ enum struct RoadConnections : uint8_t {
   Down = 1 << 2,
   Left = 1 << 3
 };
+
+std::random_device rd;
+std::mt19937 eng{std::mt19937(rd())};
+std::uniform_int_distribution<> distr{std::uniform_int_distribution<>(1, 15)};
+
+int get_random() { return distr(eng); }
 
 struct Tile {
   TileType m_type{TileType::None};
@@ -44,14 +55,14 @@ struct Tile {
           switch (con) {
           case RoadConnections::Up: {
             auto road = SDL_FRect{m_rect.x + m_rect.w * 0.25f, m_rect.y,
-                                  m_rect.w * 0.5f, m_rect.h * 0.5f};
+                                  m_rect.w * 0.5f, m_rect.h * 0.75f};
             SDL_SetRenderDrawColor(r, 0xf3, 0xd9, 0xab, 0xFF);
             SDL_RenderFillRect(r, &road);
             break;
           }
           case RoadConnections::Right: {
-            auto road = SDL_FRect{m_rect.x + m_rect.w * 0.5f,
-                                  m_rect.y + m_rect.h * 0.25f, m_rect.w * 0.5f,
+            auto road = SDL_FRect{m_rect.x + m_rect.w * 0.25f,
+                                  m_rect.y + m_rect.h * 0.25f, m_rect.w * 0.75f,
                                   m_rect.h * 0.5f};
             SDL_SetRenderDrawColor(r, 0xf3, 0xd9, 0xab, 0xFF);
             SDL_RenderFillRect(r, &road);
@@ -59,15 +70,15 @@ struct Tile {
           }
           case RoadConnections::Down: {
             auto road = SDL_FRect{m_rect.x + m_rect.w * 0.25f,
-                                  m_rect.y + m_rect.h * 0.5f, m_rect.w * 0.5f,
-                                  m_rect.h * 0.5f};
+                                  m_rect.y + m_rect.h * 0.25f, m_rect.w * 0.5f,
+                                  m_rect.h * 0.75f};
             SDL_SetRenderDrawColor(r, 0xf3, 0xd9, 0xab, 0xFF);
             SDL_RenderFillRect(r, &road);
             break;
           }
           case RoadConnections::Left: {
             auto road = SDL_FRect{m_rect.x, m_rect.y + m_rect.h * 0.25f,
-                                  m_rect.w * 0.5f, m_rect.h * 0.5f};
+                                  m_rect.w * 0.75f, m_rect.h * 0.5f};
             SDL_SetRenderDrawColor(r, 0xf3, 0xd9, 0xab, 0xFF);
             SDL_RenderFillRect(r, &road);
             break;
@@ -77,6 +88,17 @@ struct Tile {
           }
         }
       }
+      break;
+    }
+    case TileType::Dragon: {
+      SDL_SetRenderDrawColor(r, 0xFF, 0x0, 0x7F, 0xFF);
+      SDL_RenderFillRect(r, &m_rect);
+      break;
+    }
+    case TileType::Equipment: {
+      SDL_SetRenderDrawColor(r, 0x0, 0xAA, 0x7F, 0xFF);
+      SDL_RenderFillRect(r, &m_rect);
+      break;
     }
     default:
       break;
@@ -96,8 +118,12 @@ struct Board {
   float m_tile_width{};
   float m_tile_height{};
   std::array<Tile, m_board_size> m_tiles;
+  std::vector<Tile> m_draw_pile;
   SDL_FPoint m_position{};
   SDL_FRect m_board_rect{};
+  SDL_FRect m_entry_arrow{};
+  SDL_FPoint m_entry_arrow_points[3];
+  SDL_FRect m_exit_arrow{};
   Tile *m_selected_tile{nullptr};
 
   void init(int res_x, int res_y) {
@@ -125,6 +151,120 @@ struct Board {
                                 m_position.y + (y * m_tile_height),
                                 m_tile_width, m_tile_height};
       }
+    }
+
+    m_entry_arrow = SDL_FRect{
+        m_position.x - 50.0f,
+        m_position.y + m_board_rect.h - (m_tile_height * 0.5f) - 7.5f,
+        30,
+        15,
+    };
+    m_entry_arrow_points[0] = SDL_FPoint{
+        m_entry_arrow.x + m_entry_arrow.w - 5.0f, m_entry_arrow.y - 5.0f};
+    m_entry_arrow_points[1] = SDL_FPoint{
+        m_entry_arrow.x + m_entry_arrow.w + 5.0f, m_entry_arrow.y + 7.5f};
+    m_entry_arrow_points[2] =
+        SDL_FPoint{m_entry_arrow.x + m_entry_arrow.w - 5.0f,
+                   m_entry_arrow.y + m_entry_arrow.h + 5.0f};
+
+    constexpr size_t equipment_count = 3;
+    for (size_t i{0}; i < equipment_count; ++i) {
+      auto& tile = get_tile(get_random() % m_board_width, 1 + (get_random() % (m_board_height - 2)));
+      tile.m_type = TileType::Equipment;
+    }
+
+    randomize_draw_pile();
+  }
+
+  void randomize_draw_pile() {
+    m_draw_pile.clear();
+    // Tiles:
+    // 21 roads
+    // 16 dragons
+    // 3 knights equipment
+    m_draw_pile.push_back(
+        Tile{.m_type = TileType::Road,
+             .m_road_connections = static_cast<uint8_t>(RoadConnections::Up)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Right)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Down)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Left)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Up) |
+                              static_cast<uint8_t>(RoadConnections::Right)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Down) |
+                              static_cast<uint8_t>(RoadConnections::Right)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Left) |
+                              static_cast<uint8_t>(RoadConnections::Right)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Up) |
+                              static_cast<uint8_t>(RoadConnections::Left)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Right) |
+                              static_cast<uint8_t>(RoadConnections::Left)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Down) |
+                              static_cast<uint8_t>(RoadConnections::Left)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Right) |
+                              static_cast<uint8_t>(RoadConnections::Up)});
+    m_draw_pile.push_back(
+        Tile{.m_type = TileType::Road,
+             .m_road_connections = static_cast<uint8_t>(RoadConnections::Down) |
+                                   static_cast<uint8_t>(RoadConnections::Up)});
+    m_draw_pile.push_back(
+        Tile{.m_type = TileType::Road,
+             .m_road_connections = static_cast<uint8_t>(RoadConnections::Left) |
+                                   static_cast<uint8_t>(RoadConnections::Up)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Up) |
+                              static_cast<uint8_t>(RoadConnections::Down)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Right) |
+                              static_cast<uint8_t>(RoadConnections::Down)});
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Left) |
+                              static_cast<uint8_t>(RoadConnections::Down)});
+    m_draw_pile.push_back(
+        Tile{.m_type = TileType::Road, .m_road_connections = 15});
+    m_draw_pile.push_back(
+        Tile{.m_type = TileType::Road, .m_road_connections = 15});
+    m_draw_pile.push_back(
+        Tile{.m_type = TileType::Road, .m_road_connections = 15});
+    m_draw_pile.push_back(
+        Tile{.m_type = TileType::Road, .m_road_connections = 15});
+    m_draw_pile.push_back(
+        Tile{.m_type = TileType::Road, .m_road_connections = 15});
+
+    constexpr size_t dragons_count = 16;
+    for (size_t i{0}; i < dragons_count; ++i)
+      m_draw_pile.push_back(Tile{.m_type = TileType::Dragon});
+
+    std::ranges::shuffle(m_draw_pile, eng);
+  }
+
+  void test_tiles() {
+    for (size_t i{0}; i < 16; ++i) {
+      auto &tile = get_tile(i % m_board_width, i / m_board_width);
+      tile.m_type = TileType::Road;
+      tile.m_road_connections = i;
     }
   }
 
@@ -156,16 +296,21 @@ struct Board {
       SDL_SetRenderDrawColor(r, 0xFF, 0xFF, 0xFF, 0x20);
       SDL_RenderFillRect(r, &m_selected_tile->m_rect);
     }
+
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+    SDL_SetRenderDrawColor(r, 0xFF, 0x0, 0x0, 0xFF);
+    SDL_RenderRect(r, &m_entry_arrow);
+    SDL_RenderLines(r, m_entry_arrow_points, 3);
   }
 };
 
 struct State {
   SDL_Renderer *renderer;
   SDL_Window *window;
-
+  TTF_Font *font;
   Board board{};
-
   bool m_running{true};
+  Tile m_next_tile;
 };
 
 void update(State &st) {
@@ -189,16 +334,35 @@ void update(State &st) {
       }
     } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
       if (event.button.button == SDL_BUTTON_LEFT) {
-        if (st.board.m_selected_tile) {
-          st.board.m_selected_tile->m_type = TileType::Road;
-          st.board.m_selected_tile->m_road_connections |=
-              static_cast<uint8_t>(RoadConnections::Up);
-          st.board.m_selected_tile->m_road_connections |=
-              static_cast<uint8_t>(RoadConnections::Down);
+        if (st.board.m_selected_tile &&
+            st.board.m_selected_tile->m_type == TileType::None) {
+          if (!st.board.m_draw_pile.empty()) {
+            st.m_next_tile.m_rect = st.board.m_selected_tile->m_rect;
+            *st.board.m_selected_tile = st.m_next_tile;
+            st.m_next_tile = st.board.m_draw_pile.back();
+            st.board.m_draw_pile.pop_back();
+          }
         }
       }
     }
   }
+}
+
+void render_text(SDL_Renderer *r, const char *text, TTF_Font *font, float x,
+                 float y, SDL_Color &c) {
+  auto text_surface = TTF_RenderText_Solid(font, text, 0, c);
+  auto text_texture = SDL_CreateTextureFromSurface(r, text_surface);
+
+  SDL_FRect d;
+  d.x = x;
+  d.y = y;
+  d.w = text_texture->w;
+  d.h = text_texture->h;
+
+  SDL_RenderTexture(r, text_texture, 0, &d);
+
+  SDL_DestroySurface(text_surface);
+  SDL_DestroyTexture(text_texture);
 }
 
 int main() {
@@ -215,6 +379,18 @@ int main() {
     return 1;
   }
 
+  if (!TTF_Init()) {
+    SDL_Log("Couldn't initialize SDL_ttf");
+    return 1;
+  }
+
+  state.font =
+      TTF_OpenFont(std::filesystem::path{"./NotoSans.ttf"}.c_str(), 16.0f);
+  if (!state.font) {
+    SDL_Log("Couldn't load font :(");
+    return 1;
+  }
+
   if (!SDL_CreateWindowAndRenderer(title, res_x, res_y, 0, &state.window,
                                    &state.renderer)) {
     SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
@@ -222,6 +398,11 @@ int main() {
   }
 
   state.board.init(res_x, res_y);
+  state.m_next_tile = state.board.m_draw_pile.back();
+  state.board.m_draw_pile.pop_back();
+
+  const char *text = "Dragons Aside";
+  SDL_Color white = {0xFF, 0xFF, 0xFF, 0xFF};
 
   while (state.m_running) {
     update(state);
@@ -231,7 +412,11 @@ int main() {
     SDL_RenderClear(state.renderer);
 
     state.board.render(state.renderer);
+    render_text(state.renderer, text, state.font, 10.0f, 10.0f, white);
+    render_text(state.renderer, "Drawn tile:", state.font, 10.0f, 30.0f, white);
+    state.m_next_tile.render(state.renderer);
 
+    // SDL_RenderTexture(state.renderer, text_texture, NULL, &d);
     SDL_RenderPresent(state.renderer);
   }
 
