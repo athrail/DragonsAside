@@ -9,19 +9,19 @@
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <format>
 #include <random>
 #include <vector>
-#include <format>
 
 #include "board.hpp"
 #include "tile.hpp"
 
 std::random_device rd;
 std::mt19937 eng{std::mt19937(rd())};
-std::uniform_int_distribution<> distr{std::uniform_int_distribution<>(1, 15)};
+std::uniform_int_distribution<> distr{std::uniform_int_distribution<>(0, 5)};
 std::vector<std::string> game_log{};
 
-void add_log_message(std::string message) { game_log.emplace_back(message); }
+void add_log_message(const char *message) { game_log.emplace_back(message); }
 
 int get_random() { return distr(eng); }
 
@@ -33,6 +33,7 @@ struct State {
   bool m_running{true};
   Tile m_next_tile;
   uint8_t m_eq_count{0};
+  bool m_game_over{false};
 };
 
 void update(State &st) {
@@ -63,7 +64,11 @@ void update(State &st) {
             if (st.m_next_tile.m_type != TileType::None) {
               if (tile_type == TileType::Equipment) {
                 st.m_eq_count++;
-                add_log_message(std::format("Knights equipment gathered! You've got %d pieces.", st.m_eq_count).c_str());
+                add_log_message(
+                    std::format(
+                        "Knights equipment gathered! You've got {} pieces.",
+                        st.m_eq_count)
+                        .c_str());
               }
               SDL_FRect drawn_tile_rect = st.m_next_tile.m_rect;
               st.m_next_tile.m_rect = st.board.m_selected_tile->m_rect;
@@ -86,20 +91,29 @@ void update(State &st) {
   }
 
   while (st.m_next_tile.m_type == TileType::Dragon) {
-    uint8_t x = get_random() % st.board.m_board_width;
-    uint8_t y = 1 + get_random() % (st.board.m_board_width - 2);
+    uint8_t x = get_random();
+    uint8_t y = 1 + get_random();
     auto &random_tile = st.board.get_tile(x, y);
 
-    if ((random_tile.m_type == TileType::Road) |
-        (random_tile.m_type == TileType::None)) {
-      add_log_message(std::format("Dragon lands on tile %d, %d", x, y));
+    if (random_tile.m_type != TileType::Dragon) {
+      add_log_message(std::format("Dragon lands on tile {}, {}", x, y).c_str());
 
       if (random_tile.m_type == TileType::Road) {
         if (st.m_eq_count > 0) {
           st.m_eq_count--;
-          add_log_message(std::format("Dragon was defeated using Knight's Equipment. Pieces left: %d", st.m_eq_count).c_str());
+          add_log_message(std::format("Dragon was defeated using Knight's "
+                                      "Equipment. Pieces left: {}",
+                                      st.m_eq_count)
+                              .c_str());
           break;
         }
+      } else if (random_tile.m_type == TileType::Equipment) {
+        random_tile.m_type = TileType::None;
+        add_log_message(
+            std::format(
+                "Dragon was defeated using Knight's Equipment from the board")
+                .c_str());
+        break;
       }
       SDL_FRect drawn_tile_rect = st.m_next_tile.m_rect;
       st.m_next_tile.m_rect = random_tile.m_rect;

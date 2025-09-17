@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <random>
 
 #include "board.hpp"
@@ -50,8 +51,7 @@ void Board::init(int res_x, int res_y) {
 
   constexpr size_t equipment_count = 3;
   for (size_t i{0}; i < equipment_count; ++i) {
-    auto &tile = get_tile(get_random() % m_board_width,
-                          1 + (get_random() % (m_board_height - 2)));
+    auto &tile = get_tile(get_random(), 1 + get_random());
     tile.m_type = TileType::Equipment;
   }
 
@@ -101,6 +101,8 @@ void Board::randomize_draw_pile() {
 }
 
 Tile &Board::get_tile(uint8_t x, uint8_t y) {
+  assert(x < m_board_width);
+  assert(y < m_board_height);
   return m_tiles.at((y * m_board_width) + x);
 }
 
