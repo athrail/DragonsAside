@@ -13,6 +13,8 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/vendor")
 
 add_executable(dragons
   "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/board.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/tile.cpp"
 )
 
 target_link_libraries(dragons PRIVATE vendor)
