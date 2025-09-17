@@ -23,6 +23,7 @@ struct Tile {
 
   bool has_road_connection(RoadConnections &con);
   void render(SDL_Renderer *r);
+  void rotate();
 };
 
 #endif // _TILE_HPP

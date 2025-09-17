@@ -2,6 +2,7 @@
 #include <random>
 
 #include "board.hpp"
+#include "tile.hpp"
 
 extern int get_random();
 extern std::mt19937 eng;
@@ -60,75 +61,33 @@ void Board::init(int res_x, int res_y) {
 void Board::randomize_draw_pile() {
   m_draw_pile.clear();
   // Tiles:
-  // 21 roads
+  // 21 roads (1 dead end, 7 straights, 4 turns, 7 T turns, 2 crossroads)
   // 16 dragons
   // 3 knights equipment
   m_draw_pile.push_back(
       Tile{.m_type = TileType::Road,
            .m_road_connections = static_cast<uint8_t>(RoadConnections::Up)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Right)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Down)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Left)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Up) |
-                                 static_cast<uint8_t>(RoadConnections::Right)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Down) |
-                                 static_cast<uint8_t>(RoadConnections::Right)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Left) |
-                                 static_cast<uint8_t>(RoadConnections::Right)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Up) |
-                                 static_cast<uint8_t>(RoadConnections::Left)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Right) |
-                                 static_cast<uint8_t>(RoadConnections::Left)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Down) |
-                                 static_cast<uint8_t>(RoadConnections::Left)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Right) |
-                                 static_cast<uint8_t>(RoadConnections::Up)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Down) |
-                                 static_cast<uint8_t>(RoadConnections::Up)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Left) |
-                                 static_cast<uint8_t>(RoadConnections::Up)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Up) |
-                                 static_cast<uint8_t>(RoadConnections::Down)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Right) |
-                                 static_cast<uint8_t>(RoadConnections::Down)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road,
-           .m_road_connections = static_cast<uint8_t>(RoadConnections::Left) |
-                                 static_cast<uint8_t>(RoadConnections::Down)});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road, .m_road_connections = 15});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road, .m_road_connections = 15});
-  m_draw_pile.push_back(
-      Tile{.m_type = TileType::Road, .m_road_connections = 15});
+
+  for (size_t i{0}; i < 7; ++i) {
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Up) |
+                              static_cast<uint8_t>(RoadConnections::Down)});
+
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Up) |
+                              static_cast<uint8_t>(RoadConnections::Down) |
+                              static_cast<uint8_t>(RoadConnections::Left)});
+  }
+
+  for (size_t i{0}; i < 4; ++i) {
+    m_draw_pile.push_back(Tile{
+        .m_type = TileType::Road,
+        .m_road_connections = static_cast<uint8_t>(RoadConnections::Up) |
+                              static_cast<uint8_t>(RoadConnections::Left)});
+  }
+
   m_draw_pile.push_back(
       Tile{.m_type = TileType::Road, .m_road_connections = 15});
   m_draw_pile.push_back(
@@ -159,19 +118,19 @@ void Board::unselect() {
   }
 }
 
-  void Board::render(SDL_Renderer *r) {
-    for (auto &tile : m_tiles) {
-      tile.render(r);
-    }
-
-    if (m_selected_tile) {
-      SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-      SDL_SetRenderDrawColor(r, 0xFF, 0xFF, 0xFF, 0x20);
-      SDL_RenderFillRect(r, &m_selected_tile->m_rect);
-    }
-
-    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
-    SDL_SetRenderDrawColor(r, 0xFF, 0x0, 0x0, 0xFF);
-    SDL_RenderRect(r, &m_entry_arrow);
-    SDL_RenderLines(r, m_entry_arrow_points, 3);
+void Board::render(SDL_Renderer *r) {
+  for (auto &tile : m_tiles) {
+    tile.render(r);
   }
+
+  if (m_selected_tile) {
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(r, 0xFF, 0xFF, 0xFF, 0x20);
+    SDL_RenderFillRect(r, &m_selected_tile->m_rect);
+  }
+
+  SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(r, 0xFF, 0x0, 0x0, 0xFF);
+  SDL_RenderRect(r, &m_entry_arrow);
+  SDL_RenderLines(r, m_entry_arrow_points, 3);
+}

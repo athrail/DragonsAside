@@ -12,8 +12,8 @@
 #include <random>
 #include <vector>
 
-#include "tile.hpp"
 #include "board.hpp"
+#include "tile.hpp"
 
 std::random_device rd;
 std::mt19937 eng{std::mt19937(rd())};
@@ -71,6 +71,8 @@ void update(State &st) {
             }
           }
         }
+      } else if (event.button.button == SDL_BUTTON_RIGHT) {
+        st.m_next_tile.rotate();
       }
     }
   }
@@ -82,7 +84,7 @@ void update(State &st) {
     if (random_tile.m_type == TileType::None) {
       SDL_FRect drawn_tile_rect = st.m_next_tile.m_rect;
       st.m_next_tile.m_rect = random_tile.m_rect;
-      *st.board.m_selected_tile = st.m_next_tile;
+      random_tile = st.m_next_tile;
       st.m_next_tile.m_type = TileType::None;
 
       if (st.board.m_draw_pile.empty())
@@ -167,7 +169,6 @@ int main() {
 
     state.m_next_tile.render(state.renderer);
 
-    // SDL_RenderTexture(state.renderer, text_texture, NULL, &d);
     SDL_RenderPresent(state.renderer);
   }
 
