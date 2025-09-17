@@ -9,11 +9,11 @@
 
 #include "tile.hpp"
 
-bool Tile::has_road_connection(RoadConnections &con) {
+bool Tile::has_road_connection(const RoadConnections &con) const {
   return !!(m_road_connections & static_cast<uint8_t>(con));
 }
 
-void Tile::render(SDL_Renderer *r) {
+void Tile::render(SDL_Renderer *r) const {
   const std::array<RoadConnections, 4> connections{
       RoadConnections::Up, RoadConnections::Right, RoadConnections::Down,
       RoadConnections::Left};

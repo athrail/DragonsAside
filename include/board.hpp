@@ -21,6 +21,7 @@ public:
   Tile *m_selected_tile{nullptr};
   SDL_FPoint m_position{};
   SDL_FRect m_board_rect{};
+  std::vector<SDL_Point> m_valid_moves;
 
 private:
   std::array<Tile, m_board_size> m_tiles;
@@ -35,6 +36,7 @@ public:
   void set_selected(uint8_t x, uint8_t y);
   void unselect();
   void render(SDL_Renderer *r);
+  void add_valid_moves_from_tile(const int x, const int y);
 };
 
 #endif // _BOARD_HPP

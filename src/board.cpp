@@ -56,6 +56,9 @@ void Board::init(int res_x, int res_y) {
   }
 
   randomize_draw_pile();
+
+  m_valid_moves.push_back({0, 7});
+  m_valid_moves.push_back({5, 0});
 }
 
 void Board::randomize_draw_pile() {
@@ -125,14 +128,79 @@ void Board::render(SDL_Renderer *r) {
     tile.render(r);
   }
 
+  SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
   if (m_selected_tile) {
-    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(r, 0xFF, 0xFF, 0xFF, 0x20);
     SDL_RenderFillRect(r, &m_selected_tile->m_rect);
+  }
+
+  SDL_SetRenderDrawColor(r, 0x0, 0xFF, 0x0, 0x20);
+  for (auto &point : m_valid_moves) {
+    SDL_RenderFillRect(r, &get_tile(point.x, point.y).m_rect);
   }
 
   SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(r, 0xFF, 0x0, 0x0, 0xFF);
   SDL_RenderRect(r, &m_entry_arrow);
   SDL_RenderLines(r, m_entry_arrow_points, 3);
+}
+
+void Board::add_valid_moves_from_tile(const int x, const int y) {
+  const auto &tile = get_tile(x, y);
+  const std::array<RoadConnections, 4> connections = {
+      RoadConnections::Up, RoadConnections::Down, RoadConnections::Left,
+      RoadConnections::Right};
+
+  for (auto &con : connections) {
+    switch (con) {
+    case RoadConnections::Up: {
+      if (y == 0)
+        break;
+      if (!tile.has_road_connection(con))
+        break;
+      const auto &upper_tile = get_tile(x, y - 1);
+      if ((upper_tile.m_type == TileType::Road) ||
+          (upper_tile.m_type == TileType::Dragon))
+        break;
+      m_valid_moves.push_back(SDL_Point{x, y - 1});
+      break;
+    }
+    case RoadConnections::Right: {
+      if (x == m_board_width - 1)
+        break;
+      if (!tile.has_road_connection(con))
+        break;
+      const auto &right_tile = get_tile(x + 1, y);
+      if ((right_tile.m_type == TileType::Road) ||
+          (right_tile.m_type == TileType::Dragon))
+        break;
+      m_valid_moves.push_back(SDL_Point{x + 1, y});
+      break;
+    }
+    case RoadConnections::Down: {
+      if (y == m_board_height - 1)
+        break;
+      if (!tile.has_road_connection(con))
+        break;
+      const auto &right_tile = get_tile(x, y + 1);
+      if ((right_tile.m_type == TileType::Road) ||
+          (right_tile.m_type == TileType::Dragon))
+        break;
+      m_valid_moves.push_back(SDL_Point{x, y + 1});
+      break;
+    }
+    case RoadConnections::Left: {
+      if (x == 0)
+        break;
+      if (!tile.has_road_connection(con))
+        break;
+      const auto &right_tile = get_tile(x - 1, y);
+      if ((right_tile.m_type == TileType::Road) ||
+          (right_tile.m_type == TileType::Dragon))
+        break;
+      m_valid_moves.push_back(SDL_Point{x - 1, y});
+      break;
+    }
+    }
+  }
 }

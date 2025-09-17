@@ -6,6 +6,7 @@
 #include <SDL3/SDL_render.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
@@ -36,6 +37,53 @@ struct State {
   bool m_game_over{false};
 };
 
+bool is_move_valid(State &st, uint8_t x, uint8_t y) {
+  auto result = std::ranges::find_if(
+      st.board.m_valid_moves,
+      [x, y](const SDL_Point &p) -> bool { return p.x == x && p.y == y; });
+  if (result == std::end(st.board.m_valid_moves))
+    return false;
+
+  auto &tile_to_place = st.m_next_tile;
+
+  const std::array<RoadConnections, 4> connections = {
+      RoadConnections::Up, RoadConnections::Down, RoadConnections::Left,
+      RoadConnections::Right};
+  bool valid{false};
+  for (auto &con : connections) {
+    switch (con) {
+    // bug on edges when testing for connections
+    case RoadConnections::Up:
+      if ((x == st.board.m_board_width - 1) && (y == 0))
+        return true;
+
+      if ((y > 0) && tile_to_place.has_road_connection(con))
+        valid = valid || st.board.get_tile(x, y - 1).has_road_connection(
+                             RoadConnections::Down);
+      break;
+    case RoadConnections::Right:
+      if ((x > 0) && tile_to_place.has_road_connection(con))
+        valid = valid || st.board.get_tile(x + 1, y).has_road_connection(
+                             RoadConnections::Left);
+      break;
+    case RoadConnections::Down:
+      if ((y < 7) && tile_to_place.has_road_connection(con))
+        valid = valid || st.board.get_tile(x, y + 1).has_road_connection(
+                             RoadConnections::Up);
+      break;
+    case RoadConnections::Left:
+      if ((x == 0) && (y == st.board.m_board_height - 1))
+        return true;
+      if ((x < 5) && tile_to_place.has_road_connection(con))
+        valid = valid || st.board.get_tile(x - 1, y).has_road_connection(
+                             RoadConnections::Right);
+      break;
+    }
+  }
+
+  return valid;
+}
+
 void update(State &st) {
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
@@ -58,6 +106,15 @@ void update(State &st) {
     } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
       if (event.button.button == SDL_BUTTON_LEFT) {
         if (st.board.m_selected_tile) {
+          const auto p = SDL_FPoint{event.motion.x, event.motion.y};
+          const int tile_x =
+              (p.x - st.board.m_position.x) / st.board.m_tile_width;
+          const int tile_y =
+              (p.y - st.board.m_position.y) / st.board.m_tile_height;
+
+          if (!is_move_valid(st, tile_x, tile_y))
+            return;
+
           auto tile_type = st.board.m_selected_tile->m_type;
           if ((tile_type == TileType::None) ||
               (tile_type == TileType::Equipment)) {
@@ -70,10 +127,16 @@ void update(State &st) {
                         st.m_eq_count)
                         .c_str());
               }
+
+              std::erase_if(st.board.m_valid_moves,
+                            [tile_x, tile_y](const SDL_Point &p) -> bool {
+                              return p.x == tile_x && p.y == tile_y;
+                            });
               SDL_FRect drawn_tile_rect = st.m_next_tile.m_rect;
               st.m_next_tile.m_rect = st.board.m_selected_tile->m_rect;
               *st.board.m_selected_tile = st.m_next_tile;
               st.m_next_tile.m_type = TileType::None;
+              st.board.add_valid_moves_from_tile(tile_x, tile_y);
 
               if (st.board.m_draw_pile.empty())
                 return;

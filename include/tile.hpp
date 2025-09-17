@@ -21,8 +21,8 @@ struct Tile {
   bool m_selected{false};
   SDL_FRect m_rect{};
 
-  bool has_road_connection(RoadConnections &con);
-  void render(SDL_Renderer *r);
+  bool has_road_connection(const RoadConnections &con) const;
+  void render(SDL_Renderer *r) const;
   void rotate();
 };
 
