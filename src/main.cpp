@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <random>
 #include <vector>
+#include <format>
 
 #include "board.hpp"
 #include "tile.hpp"
@@ -18,6 +19,9 @@
 std::random_device rd;
 std::mt19937 eng{std::mt19937(rd())};
 std::uniform_int_distribution<> distr{std::uniform_int_distribution<>(1, 15)};
+std::vector<std::string> game_log{};
+
+void add_log_message(std::string message) { game_log.emplace_back(message); }
 
 int get_random() { return distr(eng); }
 
@@ -57,6 +61,10 @@ void update(State &st) {
           if ((tile_type == TileType::None) ||
               (tile_type == TileType::Equipment)) {
             if (st.m_next_tile.m_type != TileType::None) {
+              if (tile_type == TileType::Equipment) {
+                st.m_eq_count++;
+                add_log_message(std::format("Knights equipment gathered! You've got %d pieces.", st.m_eq_count).c_str());
+              }
               SDL_FRect drawn_tile_rect = st.m_next_tile.m_rect;
               st.m_next_tile.m_rect = st.board.m_selected_tile->m_rect;
               *st.board.m_selected_tile = st.m_next_tile;
@@ -78,10 +86,21 @@ void update(State &st) {
   }
 
   while (st.m_next_tile.m_type == TileType::Dragon) {
-    auto &random_tile =
-        st.board.get_tile(get_random() % st.board.m_board_width,
-                          1 + (get_random() % (st.board.m_board_height - 2)));
-    if (random_tile.m_type == TileType::None) {
+    uint8_t x = get_random() % st.board.m_board_width;
+    uint8_t y = 1 + get_random() % (st.board.m_board_width - 2);
+    auto &random_tile = st.board.get_tile(x, y);
+
+    if ((random_tile.m_type == TileType::Road) |
+        (random_tile.m_type == TileType::None)) {
+      add_log_message(std::format("Dragon lands on tile %d, %d", x, y));
+
+      if (random_tile.m_type == TileType::Road) {
+        if (st.m_eq_count > 0) {
+          st.m_eq_count--;
+          add_log_message(std::format("Dragon was defeated using Knight's Equipment. Pieces left: %d", st.m_eq_count).c_str());
+          break;
+        }
+      }
       SDL_FRect drawn_tile_rect = st.m_next_tile.m_rect;
       st.m_next_tile.m_rect = random_tile.m_rect;
       random_tile = st.m_next_tile;
@@ -97,8 +116,9 @@ void update(State &st) {
   }
 }
 
-void render_text(SDL_Renderer *r, const char *text, TTF_Font *font, float x,
-                 float y, SDL_Color &c) {
+void render_text(SDL_Renderer *r, const char *text, TTF_Font *font, int x,
+                 int y, SDL_Color &c) {
+  SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
   auto text_surface = TTF_RenderText_Solid(font, text, 0, c);
   auto text_texture = SDL_CreateTextureFromSurface(r, text_surface);
 
@@ -112,6 +132,16 @@ void render_text(SDL_Renderer *r, const char *text, TTF_Font *font, float x,
 
   SDL_DestroySurface(text_surface);
   SDL_DestroyTexture(text_texture);
+}
+
+void render_game_log(SDL_Renderer *r, const SDL_FPoint &initial_position,
+                     TTF_Font *font) {
+  SDL_Color white = {0xFF, 0xFF, 0xFF, 0xFF};
+  for (size_t i{0}; auto &message : game_log) {
+    render_text(r, message.c_str(), font, initial_position.x,
+                initial_position.y + (20.0f * i), white);
+    ++i;
+  }
 }
 
 int main() {
@@ -149,9 +179,12 @@ int main() {
   state.board.init(res_x, res_y);
   state.m_next_tile = state.board.m_draw_pile.back();
   state.board.m_draw_pile.pop_back();
-  SDL_FRect drawn_tile_rect{10.0f, 60.0f, state.board.m_tile_width,
-                            state.board.m_tile_height};
+  const SDL_FRect drawn_tile_rect{10.0f, 60.0f, state.board.m_tile_width,
+                                  state.board.m_tile_height};
   state.m_next_tile.m_rect = drawn_tile_rect;
+  const SDL_FPoint game_log_pos =
+      SDL_FPoint{state.board.m_position.x + state.board.m_board_rect.w + 20.0f,
+                 state.board.m_position.y};
 
   const char *text = "Dragons Aside";
   SDL_Color white = {0xFF, 0xFF, 0xFF, 0xFF};
@@ -166,6 +199,8 @@ int main() {
     state.board.render(state.renderer);
     render_text(state.renderer, text, state.font, 10.0f, 10.0f, white);
     render_text(state.renderer, "Drawn tile:", state.font, 10.0f, 30.0f, white);
+
+    render_game_log(state.renderer, game_log_pos, state.font);
 
     state.m_next_tile.render(state.renderer);
 
