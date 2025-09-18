@@ -14,6 +14,7 @@
 #include <random>
 #include <vector>
 
+#include "SDL3/SDL_keycode.h"
 #include "board.hpp"
 #include "tile.hpp"
 
@@ -36,6 +37,16 @@ struct State {
   uint8_t m_eq_count{0};
   bool m_game_over{false};
 };
+
+void new_game(State &state) {
+  state.board.new_game();
+  state.m_next_tile = state.board.m_draw_pile.back();
+  state.board.m_draw_pile.pop_back();
+  const SDL_FRect drawn_tile_rect{10.0f, 60.0f, state.board.m_tile_width,
+                                  state.board.m_tile_height};
+  state.m_next_tile.m_rect = drawn_tile_rect;
+  game_log.clear();
+}
 
 bool is_move_valid(State &st, uint8_t x, uint8_t y) {
   auto result = std::ranges::find_if(
@@ -67,12 +78,14 @@ bool is_move_valid(State &st, uint8_t x, uint8_t y) {
                              RoadConnections::Down);
       break;
     case RoadConnections::Right:
-      if ((x < st.board.m_board_width - 1) && tile_to_place.has_road_connection(con))
+      if ((x < st.board.m_board_width - 1) &&
+          tile_to_place.has_road_connection(con))
         valid = valid || st.board.get_tile(x + 1, y).has_road_connection(
                              RoadConnections::Left);
       break;
     case RoadConnections::Down:
-      if ((y < st.board.m_board_height - 1) && tile_to_place.has_road_connection(con))
+      if ((y < st.board.m_board_height - 1) &&
+          tile_to_place.has_road_connection(con))
         valid = valid || st.board.get_tile(x, y + 1).has_road_connection(
                              RoadConnections::Up);
       break;
@@ -95,6 +108,8 @@ void update(State &st) {
     } else if (event.type == SDL_EVENT_KEY_DOWN) {
       if (event.key.key == SDLK_ESCAPE)
         st.m_running = false;
+      else if (event.key.key == SDLK_N)
+        new_game(st);
     } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
       const auto p = SDL_FPoint{event.motion.x, event.motion.y};
       if (SDL_PointInRectFloat(&p, &st.board.m_board_rect)) {
@@ -135,6 +150,7 @@ void update(State &st) {
                             [tile_x, tile_y](const SDL_Point &p) -> bool {
                               return p.x == tile_x && p.y == tile_y;
                             });
+
               SDL_FRect drawn_tile_rect = st.m_next_tile.m_rect;
               st.m_next_tile.m_rect = st.board.m_selected_tile->m_rect;
               *st.board.m_selected_tile = st.m_next_tile;
@@ -260,14 +276,10 @@ int main() {
   }
 
   state.board.init(res_x, res_y);
-  state.m_next_tile = state.board.m_draw_pile.back();
-  state.board.m_draw_pile.pop_back();
-  const SDL_FRect drawn_tile_rect{10.0f, 60.0f, state.board.m_tile_width,
-                                  state.board.m_tile_height};
-  state.m_next_tile.m_rect = drawn_tile_rect;
   const SDL_FPoint game_log_pos =
       SDL_FPoint{state.board.m_position.x + state.board.m_board_rect.w + 20.0f,
                  state.board.m_position.y};
+  new_game(state);
 
   const char *text = "Dragons Aside";
   SDL_Color white = {0xFF, 0xFF, 0xFF, 0xFF};

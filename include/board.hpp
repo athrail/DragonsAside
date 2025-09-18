@@ -23,12 +23,6 @@ public:
   SDL_FRect m_board_rect{};
   std::vector<SDL_Point> m_valid_moves;
 
-private:
-  std::array<Tile, m_board_size> m_tiles;
-  SDL_FRect m_entry_arrow{};
-  SDL_FPoint m_entry_arrow_points[3];
-  SDL_FRect m_exit_arrow{};
-
 public:
   void init(int res_x, int res_y);
   void randomize_draw_pile();
@@ -38,6 +32,11 @@ public:
   void render(SDL_Renderer *r);
   void add_valid_moves_from_tile(const int x, const int y);
   void update_valid_moves();
+  void new_game();
+
+private:
+  std::array<Tile, m_board_size> m_tiles;
+  SDL_FRect m_exit_arrow{};
 };
 
 #endif // _BOARD_HPP

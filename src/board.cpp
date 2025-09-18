@@ -26,35 +26,29 @@ void Board::init(int res_x, int res_y) {
   m_board_rect =
       SDL_FRect{m_position.x, m_position.y, m_board_width * m_tile_width,
                 m_board_height * m_tile_height};
+  for (int x{0}; x < m_board_width; ++x) {
+    for (int y{0}; y < m_board_height; ++y) {
+      get_tile(x, y).m_rect = SDL_FRect{m_position.x + (x * m_tile_width),
+                                        m_position.y + (y * m_tile_height),
+                                        m_tile_width, m_tile_height};
+    }
+  }
+}
+
+void Board::new_game() {
+  m_valid_moves.clear();
 
   for (int x{0}; x < m_board_width; ++x) {
     for (int y{0}; y < m_board_height; ++y) {
       auto &tile = get_tile(x, y);
-      tile.m_rect = SDL_FRect{m_position.x + (x * m_tile_width),
-                              m_position.y + (y * m_tile_height), m_tile_width,
-                              m_tile_height};
+      tile.m_type = TileType::None;
+      tile.m_selected = false;
     }
   }
 
-  m_entry_arrow = SDL_FRect{
-      m_position.x - 50.0f,
-      m_position.y + m_board_rect.h - (m_tile_height * 0.5f) - 7.5f,
-      30,
-      15,
-  };
-  m_entry_arrow_points[0] = SDL_FPoint{m_entry_arrow.x + m_entry_arrow.w - 5.0f,
-                                       m_entry_arrow.y - 5.0f};
-  m_entry_arrow_points[1] = SDL_FPoint{m_entry_arrow.x + m_entry_arrow.w + 5.0f,
-                                       m_entry_arrow.y + 7.5f};
-  m_entry_arrow_points[2] =
-      SDL_FPoint{m_entry_arrow.x + m_entry_arrow.w - 5.0f,
-                 m_entry_arrow.y + m_entry_arrow.h + 5.0f};
-
   constexpr size_t equipment_count = 3;
-  for (size_t i{0}; i < equipment_count; ++i) {
-    auto &tile = get_tile(get_random(), 1 + get_random());
-    tile.m_type = TileType::Equipment;
-  }
+  for (size_t i{0}; i < equipment_count; ++i)
+    get_tile(get_random(), 1 + get_random()).m_type = TileType::Equipment;
 
   randomize_draw_pile();
 
@@ -64,6 +58,7 @@ void Board::init(int res_x, int res_y) {
 
 void Board::randomize_draw_pile() {
   m_draw_pile.clear();
+
   // Tiles:
   // 21 roads (1 dead end, 7 straights, 4 turns, 7 T turns, 2 crossroads)
   // 16 dragons
@@ -142,8 +137,6 @@ void Board::render(SDL_Renderer *r) {
 
   SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(r, 0xFF, 0x0, 0x0, 0xFF);
-  SDL_RenderRect(r, &m_entry_arrow);
-  SDL_RenderLines(r, m_entry_arrow_points, 3);
 }
 
 void Board::add_valid_moves_from_tile(const int x, const int y) {
