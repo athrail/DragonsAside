@@ -62,19 +62,19 @@ bool is_move_valid(State &st, uint8_t x, uint8_t y) {
                              RoadConnections::Down);
       break;
     case RoadConnections::Right:
-      if ((x > 0) && tile_to_place.has_road_connection(con))
+      if ((x < st.board.m_board_width - 1) && tile_to_place.has_road_connection(con))
         valid = valid || st.board.get_tile(x + 1, y).has_road_connection(
                              RoadConnections::Left);
       break;
     case RoadConnections::Down:
-      if ((y < 7) && tile_to_place.has_road_connection(con))
+      if ((y < st.board.m_board_height - 1) && tile_to_place.has_road_connection(con))
         valid = valid || st.board.get_tile(x, y + 1).has_road_connection(
                              RoadConnections::Up);
       break;
     case RoadConnections::Left:
       if ((x == 0) && (y == st.board.m_board_height - 1))
         return true;
-      if ((x < 5) && tile_to_place.has_road_connection(con))
+      if ((x > 0) && tile_to_place.has_road_connection(con))
         valid = valid || st.board.get_tile(x - 1, y).has_road_connection(
                              RoadConnections::Right);
       break;
