@@ -46,6 +46,14 @@ bool is_move_valid(State &st, uint8_t x, uint8_t y) {
 
   auto &tile_to_place = st.m_next_tile;
 
+  if ((x == 0) && (y == st.board.m_board_height - 1))
+    if (tile_to_place.has_road_connection(RoadConnections::Left))
+      return true;
+
+  if ((x == st.board.m_board_width - 1) && (y == 0))
+    if (tile_to_place.has_road_connection(RoadConnections::Up))
+      return true;
+
   const std::array<RoadConnections, 4> connections = {
       RoadConnections::Up, RoadConnections::Down, RoadConnections::Left,
       RoadConnections::Right};
@@ -54,9 +62,6 @@ bool is_move_valid(State &st, uint8_t x, uint8_t y) {
     switch (con) {
     // bug on edges when testing for connections
     case RoadConnections::Up:
-      if ((x == st.board.m_board_width - 1) && (y == 0))
-        return true;
-
       if ((y > 0) && tile_to_place.has_road_connection(con))
         valid = valid || st.board.get_tile(x, y - 1).has_road_connection(
                              RoadConnections::Down);
@@ -72,8 +77,6 @@ bool is_move_valid(State &st, uint8_t x, uint8_t y) {
                              RoadConnections::Up);
       break;
     case RoadConnections::Left:
-      if ((x == 0) && (y == st.board.m_board_height - 1))
-        return true;
       if ((x > 0) && tile_to_place.has_road_connection(con))
         valid = valid || st.board.get_tile(x - 1, y).has_road_connection(
                              RoadConnections::Right);
@@ -144,6 +147,8 @@ void update(State &st) {
               st.m_next_tile = st.board.m_draw_pile.back();
               st.m_next_tile.m_rect = drawn_tile_rect;
               st.board.m_draw_pile.pop_back();
+
+              st.board.update_valid_moves();
             }
           }
         }
@@ -189,6 +194,7 @@ void update(State &st) {
       st.m_next_tile = st.board.m_draw_pile.back();
       st.m_next_tile.m_rect = drawn_tile_rect;
       st.board.m_draw_pile.pop_back();
+      st.board.update_valid_moves();
     }
   }
 }

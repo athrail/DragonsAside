@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cassert>
 #include <random>
+#include <vector>
 
 #include "board.hpp"
 #include "tile.hpp"
@@ -203,4 +204,54 @@ void Board::add_valid_moves_from_tile(const int x, const int y) {
     }
     }
   }
+}
+
+void Board::update_valid_moves() {
+  std::erase_if(m_valid_moves, [this](const SDL_Point &p) -> bool {
+    bool valid_move{false};
+    printf("Checking %d,%d if valid\n", p.x, p.y);
+
+    if ((p.x == 0) && (p.y == m_board_height - 1))
+      return false;
+
+    if ((p.y == 0) && (p.x == m_board_width - 1))
+      return false;
+
+    auto &type = get_tile(p.x, p.y).m_type;
+    if ((type != TileType::None) && (type != TileType::Equipment)) {
+      printf("Tile already occupied\n");
+      return true;
+    }
+
+    if (p.x > 0) {
+      valid_move =
+          valid_move ||
+          get_tile(p.x - 1, p.y).has_road_connection(RoadConnections::Right);
+      printf("Checking connection on left: %b\n", valid_move);
+    }
+
+    if (p.x < m_board_width - 1) {
+      valid_move =
+          valid_move ||
+          get_tile(p.x + 1, p.y).has_road_connection(RoadConnections::Left);
+      printf("Checking connection on right: %b\n", valid_move);
+    }
+
+    if (p.y > 0) {
+      valid_move =
+          valid_move ||
+          get_tile(p.x, p.y - 1).has_road_connection(RoadConnections::Down);
+      printf("Checking connection on up: %b\n", valid_move);
+    }
+
+    if (p.y < m_board_height - 1) {
+      valid_move =
+          valid_move ||
+          get_tile(p.x, p.y + 1).has_road_connection(RoadConnections::Up);
+      printf("Checking connection on down: %b\n", valid_move);
+    }
+
+    printf("Move is valid\n");
+    return !valid_move;
+  });
 }

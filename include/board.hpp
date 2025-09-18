@@ -37,6 +37,7 @@ public:
   void unselect();
   void render(SDL_Renderer *r);
   void add_valid_moves_from_tile(const int x, const int y);
+  void update_valid_moves();
 };
 
 #endif // _BOARD_HPP
