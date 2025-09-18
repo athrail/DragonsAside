@@ -45,6 +45,7 @@ void new_game(State &state) {
   const SDL_FRect drawn_tile_rect{10.0f, 60.0f, state.board.m_tile_width,
                                   state.board.m_tile_height};
   state.m_next_tile.m_rect = drawn_tile_rect;
+  state.m_game_over = false;
   game_log.clear();
 }
 
@@ -165,6 +166,8 @@ void update(State &st) {
               st.board.m_draw_pile.pop_back();
 
               st.board.update_valid_moves();
+              if (st.board.m_valid_moves.empty())
+                st.m_game_over = true;
             }
           }
         }
@@ -211,6 +214,8 @@ void update(State &st) {
       st.m_next_tile.m_rect = drawn_tile_rect;
       st.board.m_draw_pile.pop_back();
       st.board.update_valid_moves();
+      if (st.board.m_valid_moves.empty())
+        st.m_game_over = true;
     }
   }
 }
@@ -291,9 +296,15 @@ int main() {
                                 SDL_ALPHA_OPAQUE_FLOAT);
     SDL_RenderClear(state.renderer);
 
-    state.board.render(state.renderer);
-    render_text(state.renderer, text, state.font, 10.0f, 10.0f, white);
-    render_text(state.renderer, "Drawn tile:", state.font, 10.0f, 30.0f, white);
+    if (state.m_game_over) {
+      render_text(state.renderer, "Game Over! :(", state.font, 800, 400, white);
+      render_text(state.renderer, "Press N to start new game", state.font, 800,
+                  430, white);
+    } else {
+      state.board.render(state.renderer);
+    }
+    render_text(state.renderer, text, state.font, 10, 10, white);
+    render_text(state.renderer, "Drawn tile:", state.font, 10, 30, white);
 
     render_game_log(state.renderer, game_log_pos, state.font);
 
