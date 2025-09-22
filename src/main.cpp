@@ -42,7 +42,7 @@ void new_game(State &state) {
   state.board.new_game();
   state.m_next_tile = state.board.m_draw_pile.back();
   state.board.m_draw_pile.pop_back();
-  const SDL_FRect drawn_tile_rect{10.0f, 60.0f, state.board.m_tile_width,
+  const SDL_FRect drawn_tile_rect{10.0f, 80.0f, state.board.m_tile_width,
                                   state.board.m_tile_height};
   state.m_next_tile.m_rect = drawn_tile_rect;
   state.m_game_over = false;
@@ -304,7 +304,8 @@ int main() {
       state.board.render(state.renderer);
     }
     render_text(state.renderer, text, state.font, 10, 10, white);
-    render_text(state.renderer, "Drawn tile:", state.font, 10, 30, white);
+    render_text(state.renderer, "Left click to place a tile on board, Right to rotate, N to restart game", state.font, 10, 30, white);
+    render_text(state.renderer, "Drawn tile:", state.font, 10, 50, white);
 
     render_game_log(state.renderer, game_log_pos, state.font);
 
