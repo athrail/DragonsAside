@@ -22,6 +22,8 @@ public:
   SDL_FPoint m_position{};
   SDL_FRect m_board_rect{};
   std::vector<SDL_Point> m_valid_moves;
+  SDL_Point m_start_tile{ .x = 0, .y = m_board_height - 1};
+  SDL_Point m_finish_tile{ .x = m_board_width - 1, .y = 0};
 
 public:
   void init(int res_x, int res_y);
@@ -33,9 +35,16 @@ public:
   void add_valid_moves_from_tile(const int x, const int y);
   void update_valid_moves();
   void new_game();
+  void recalculate_reachable_tiles();
+  void recalculate_end_tiles();
+  bool can_reach_end();
 
 private:
   std::array<Tile, m_board_size> m_tiles;
+  std::array<SDL_Point, m_board_size> m_reachable_tiles;
+  int m_reachable_tiles_count{0};
+  std::array<SDL_Point, m_board_size> m_end_tiles;
+  int m_end_tiles_count{0};
   SDL_FRect m_exit_arrow{};
 };
 

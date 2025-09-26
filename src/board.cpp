@@ -1,6 +1,9 @@
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
+#include <queue>
 #include <random>
+#include <string.h>
 #include <vector>
 
 #include "board.hpp"
@@ -54,6 +57,9 @@ void Board::new_game() {
 
   m_valid_moves.push_back({0, 7});
   m_valid_moves.push_back({5, 0});
+
+  recalculate_reachable_tiles();
+  recalculate_end_tiles();
 }
 
 void Board::randomize_draw_pile() {
@@ -130,8 +136,20 @@ void Board::render(SDL_Renderer *r) {
     SDL_RenderFillRect(r, &m_selected_tile->m_rect);
   }
 
-  SDL_SetRenderDrawColor(r, 0x0, 0xFF, 0x0, 0x20);
-  for (auto &point : m_valid_moves) {
+  // SDL_SetRenderDrawColor(r, 0x0, 0xFF, 0x0, 0x20);
+  // for (auto &point : m_valid_moves) {
+  //   SDL_RenderFillRect(r, &get_tile(point.x, point.y).m_rect);
+  // }
+
+  SDL_SetRenderDrawColor(r, 0x80, 0xFF, 0xff, 0x20);
+  for (int i{0}; i < m_reachable_tiles_count; ++i) {
+    auto point = m_reachable_tiles.at(i);
+    SDL_RenderFillRect(r, &get_tile(point.x, point.y).m_rect);
+  }
+
+  SDL_SetRenderDrawColor(r, 0xFF, 0x20, 0x20, 0x40);
+  for (int i{0}; i < m_end_tiles_count; ++i) {
+    auto point = m_end_tiles.at(i);
     SDL_RenderFillRect(r, &get_tile(point.x, point.y).m_rect);
   }
 
@@ -202,7 +220,6 @@ void Board::add_valid_moves_from_tile(const int x, const int y) {
 void Board::update_valid_moves() {
   std::erase_if(m_valid_moves, [this](const SDL_Point &p) -> bool {
     bool valid_move{false};
-    printf("Checking %d,%d if valid\n", p.x, p.y);
 
     if ((p.x == 0) && (p.y == m_board_height - 1))
       return false;
@@ -212,7 +229,6 @@ void Board::update_valid_moves() {
 
     auto &type = get_tile(p.x, p.y).m_type;
     if ((type != TileType::None) && (type != TileType::Equipment)) {
-      printf("Tile already occupied\n");
       return true;
     }
 
@@ -220,31 +236,128 @@ void Board::update_valid_moves() {
       valid_move =
           valid_move ||
           get_tile(p.x - 1, p.y).has_road_connection(RoadConnections::Right);
-      printf("Checking connection on left: %b\n", valid_move);
     }
 
     if (p.x < m_board_width - 1) {
       valid_move =
           valid_move ||
           get_tile(p.x + 1, p.y).has_road_connection(RoadConnections::Left);
-      printf("Checking connection on right: %b\n", valid_move);
     }
 
     if (p.y > 0) {
       valid_move =
           valid_move ||
           get_tile(p.x, p.y - 1).has_road_connection(RoadConnections::Down);
-      printf("Checking connection on up: %b\n", valid_move);
     }
 
     if (p.y < m_board_height - 1) {
       valid_move =
           valid_move ||
           get_tile(p.x, p.y + 1).has_road_connection(RoadConnections::Up);
-      printf("Checking connection on down: %b\n", valid_move);
     }
 
-    printf("Move is valid\n");
     return !valid_move;
   });
+}
+
+void Board::recalculate_reachable_tiles() {
+  memset(m_reachable_tiles.data(), 0, m_board_size * sizeof(SDL_Point));
+  m_reachable_tiles_count = 0;
+
+  std::queue<SDL_Point> tiles_to_check;
+  std::array<bool, m_board_size> visited{false};
+  tiles_to_check.emplace(m_start_tile);
+
+  while (!tiles_to_check.empty()) {
+    auto coords = tiles_to_check.front();
+    auto &tile = get_tile(coords.x, coords.y);
+    auto index = (coords.y * m_board_width) + coords.x;
+
+    if (!visited.at(index)) {
+      visited.at(index) = true;
+
+      if (tile.m_type == TileType::Road) {
+        if (tile.has_road_connection(RoadConnections::Up) && (coords.y > 0))
+          tiles_to_check.emplace(coords.x, coords.y - 1);
+        if (tile.has_road_connection(RoadConnections::Down) &&
+            (coords.y < m_board_height - 1))
+          tiles_to_check.emplace(coords.x, coords.y + 1);
+        if (tile.has_road_connection(RoadConnections::Left) && (coords.x > 0))
+          tiles_to_check.emplace(coords.x - 1, coords.y);
+        if (tile.has_road_connection(RoadConnections::Right) &&
+            (coords.x < m_board_width - 1))
+          tiles_to_check.emplace(coords.x + 1, coords.y);
+      } else if ((tile.m_type == TileType::None) ||
+                 (tile.m_type == TileType::Equipment)) {
+        if (coords.y > 0)
+          tiles_to_check.emplace(coords.x, coords.y - 1);
+        if (coords.y < m_board_height - 1)
+          tiles_to_check.emplace(coords.x, coords.y + 1);
+        if (coords.x > 0)
+          tiles_to_check.emplace(coords.x - 1, coords.y);
+        if (coords.x < m_board_width - 1)
+          tiles_to_check.emplace(coords.x + 1, coords.y);
+      }
+
+      if (tile.m_type != TileType::Dragon) {
+        m_reachable_tiles.at(m_reachable_tiles_count).x = coords.x;
+        m_reachable_tiles.at(m_reachable_tiles_count).y = coords.y;
+        m_reachable_tiles_count++;
+      }
+    }
+    tiles_to_check.pop();
+  }
+}
+
+void Board::recalculate_end_tiles() {
+  memset(m_end_tiles.data(), 0, m_board_size * sizeof(SDL_Point));
+  m_end_tiles_count = 0;
+
+  std::queue<SDL_Point> tiles_to_check;
+  std::array<bool, m_board_size> visited{false};
+  tiles_to_check.emplace(m_finish_tile);
+
+  while (!tiles_to_check.empty()) {
+    auto coords = tiles_to_check.front();
+    auto &tile = get_tile(coords.x, coords.y);
+    auto index = (coords.y * m_board_width) + coords.x;
+
+    if(coords.x == 5 && coords.y == 0)
+      fprintf(stdout, "huehue\n");
+
+    if (!visited.at(index)) {
+      visited.at(index) = true;
+
+      if ((tile.m_type == TileType::None) || (tile.m_type == TileType::Equipment)) {
+        m_end_tiles.at(m_end_tiles_count).x = coords.x;
+        m_end_tiles.at(m_end_tiles_count).y = coords.y;
+        m_end_tiles_count++;
+      } else if (tile.m_type == TileType::Road) {
+        if (tile.has_road_connection(RoadConnections::Up) && (coords.y > 0))
+          tiles_to_check.emplace(coords.x, coords.y - 1);
+        if (tile.has_road_connection(RoadConnections::Down) &&
+            (coords.y < m_board_height - 1))
+          tiles_to_check.emplace(coords.x, coords.y + 1);
+        if (tile.has_road_connection(RoadConnections::Left) && (coords.x > 0))
+          tiles_to_check.emplace(coords.x - 1, coords.y);
+        if (tile.has_road_connection(RoadConnections::Right) &&
+            (coords.x < m_board_width - 1))
+          tiles_to_check.emplace(coords.x + 1, coords.y);
+      }
+    }
+    tiles_to_check.pop();
+  }
+}
+
+bool Board::can_reach_end() {
+  for (int i{m_reachable_tiles_count - 1}; i >= 0; --i) {
+    auto tile = m_reachable_tiles.at(i);
+    for (int j{0}; j < m_end_tiles_count; ++j) {
+      auto end_tile = m_end_tiles.at(j);
+      if ((tile.x == end_tile.x) && (tile.y == end_tile.y))
+        return true;
+    }
+  }
+
+  return false;
 }
