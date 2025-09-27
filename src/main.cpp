@@ -102,7 +102,9 @@ bool is_move_valid(State &st, uint8_t x, uint8_t y) {
 }
 
 void update(State &st) {
+  bool board_changed{false};
   SDL_Event event;
+
   while (SDL_PollEvent(&event)) {
     if (event.type == SDL_EVENT_QUIT) {
       st.m_running = false;
@@ -122,6 +124,8 @@ void update(State &st) {
       } else {
         st.board.unselect();
       }
+    } else if (st.m_game_over) {
+      return;
     } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
       if (event.button.button == SDL_BUTTON_LEFT) {
         if (st.board.m_selected_tile) {
@@ -165,9 +169,7 @@ void update(State &st) {
               st.m_next_tile.m_rect = drawn_tile_rect;
               st.board.m_draw_pile.pop_back();
 
-              st.board.update_valid_moves();
-              if (st.board.m_valid_moves.empty())
-                st.m_game_over = true;
+              board_changed = true;
             }
           }
         }
@@ -213,10 +215,23 @@ void update(State &st) {
       st.m_next_tile = st.board.m_draw_pile.back();
       st.m_next_tile.m_rect = drawn_tile_rect;
       st.board.m_draw_pile.pop_back();
-      st.board.update_valid_moves();
-      if (st.board.m_valid_moves.empty())
-        st.m_game_over = true;
+
+      board_changed = true;
     }
+  }
+
+  if (board_changed) {
+    st.board.update_valid_moves();
+    if (st.board.m_valid_moves.empty()) {
+      st.m_game_over = true;
+      return;
+    }
+
+    st.board.recalculate_end_tiles();
+    st.board.recalculate_reachable_tiles();
+
+    if (!st.board.can_reach_end())
+      st.m_game_over = true;
   }
 }
 
@@ -296,15 +311,19 @@ int main() {
                                 SDL_ALPHA_OPAQUE_FLOAT);
     SDL_RenderClear(state.renderer);
 
+    state.board.render(state.renderer);
+
     if (state.m_game_over) {
       render_text(state.renderer, "Game Over! :(", state.font, 800, 400, white);
       render_text(state.renderer, "Press N to start new game", state.font, 800,
                   430, white);
-    } else {
-      state.board.render(state.renderer);
     }
+
     render_text(state.renderer, text, state.font, 10, 10, white);
-    render_text(state.renderer, "Left click to place a tile on board, Right to rotate, N to restart game", state.font, 10, 30, white);
+    render_text(state.renderer,
+                "Left click to place a tile on board, Right to rotate, N to "
+                "restart game",
+                state.font, 10, 30, white);
     render_text(state.renderer, "Drawn tile:", state.font, 10, 50, white);
 
     render_game_log(state.renderer, game_log_pos, state.font);
