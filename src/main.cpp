@@ -4,6 +4,7 @@
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_video.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <algorithm>
@@ -14,6 +15,7 @@
 #include <random>
 #include <vector>
 
+#include "SDL3/SDL_error.h"
 #include "SDL3/SDL_keycode.h"
 #include "board.hpp"
 #include "tile.hpp"
@@ -266,8 +268,8 @@ void render_game_log(SDL_Renderer *r, const SDL_FPoint &initial_position,
 int main() {
   State state{};
 
-  const size_t res_x = 1920;
-  const size_t res_y = 1080;
+  int res_x = 1920;
+  int res_y = 1080;
   const char *title = "Dragons Aside";
 
   SDL_SetAppMetadata(title, "0.1", "org.athrail.dragonsaside");
@@ -287,6 +289,18 @@ int main() {
   if (!state.font) {
     SDL_Log("Couldn't load font :(");
     return 1;
+  }
+
+  int display_count{0};
+  auto displays = SDL_GetDisplays(&display_count);
+  if (display_count > 0) {
+    auto display_mode = SDL_GetCurrentDisplayMode(displays[0]);
+    if (display_mode) {
+      if ((display_mode->w < res_x) || (display_mode->h < res_y)) {
+        res_x = 1280;
+        res_y = 720;
+      }
+    }
   }
 
   if (!SDL_CreateWindowAndRenderer(title, res_x, res_y, 0, &state.window,

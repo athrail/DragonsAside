@@ -322,9 +322,6 @@ void Board::recalculate_end_tiles() {
     auto &tile = get_tile(coords.x, coords.y);
     auto index = (coords.y * m_board_width) + coords.x;
 
-    if(coords.x == 5 && coords.y == 0)
-      fprintf(stdout, "huehue\n");
-
     if (!visited.at(index)) {
       visited.at(index) = true;
 
