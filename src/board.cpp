@@ -136,22 +136,22 @@ void Board::render(SDL_Renderer *r) {
     SDL_RenderFillRect(r, &m_selected_tile->m_rect);
   }
 
-  // SDL_SetRenderDrawColor(r, 0x0, 0xFF, 0x0, 0x20);
-  // for (auto &point : m_valid_moves) {
+  SDL_SetRenderDrawColor(r, 0x0, 0xFF, 0x0, 0x20);
+  for (auto &point : m_valid_moves) {
+    SDL_RenderFillRect(r, &get_tile(point.x, point.y).m_rect);
+  }
+
+  // SDL_SetRenderDrawColor(r, 0xFF, 0xFF, 0xFF, 0xB0);
+  // for (int i{0}; i < m_reachable_tiles_count; ++i) {
+  //   auto point = m_reachable_tiles.at(i);
   //   SDL_RenderFillRect(r, &get_tile(point.x, point.y).m_rect);
   // }
 
-  SDL_SetRenderDrawColor(r, 0x80, 0xFF, 0xff, 0x20);
-  for (int i{0}; i < m_reachable_tiles_count; ++i) {
-    auto point = m_reachable_tiles.at(i);
-    SDL_RenderFillRect(r, &get_tile(point.x, point.y).m_rect);
-  }
-
-  SDL_SetRenderDrawColor(r, 0xFF, 0x20, 0x20, 0x40);
-  for (int i{0}; i < m_end_tiles_count; ++i) {
-    auto point = m_end_tiles.at(i);
-    SDL_RenderFillRect(r, &get_tile(point.x, point.y).m_rect);
-  }
+  // SDL_SetRenderDrawColor(r, 0xFF, 0x20, 0x20, 0x40);
+  // for (int i{0}; i < m_end_tiles_count; ++i) {
+  //   auto point = m_end_tiles.at(i);
+  //   SDL_RenderFillRect(r, &get_tile(point.x, point.y).m_rect);
+  // }
 
   SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(r, 0xFF, 0x0, 0x0, 0xFF);
@@ -299,7 +299,8 @@ void Board::recalculate_reachable_tiles() {
           tiles_to_check.emplace(coords.x + 1, coords.y);
       }
 
-      if (tile.m_type != TileType::Dragon) {
+      if ((tile.m_type != TileType::Dragon) &&
+          (tile.m_type != TileType::Road)) {
         m_reachable_tiles.at(m_reachable_tiles_count).x = coords.x;
         m_reachable_tiles.at(m_reachable_tiles_count).y = coords.y;
         m_reachable_tiles_count++;
@@ -325,11 +326,15 @@ void Board::recalculate_end_tiles() {
     if (!visited.at(index)) {
       visited.at(index) = true;
 
-      if ((tile.m_type == TileType::None) || (tile.m_type == TileType::Equipment)) {
+      if ((tile.m_type == TileType::None) ||
+          (tile.m_type == TileType::Equipment)) {
         m_end_tiles.at(m_end_tiles_count).x = coords.x;
         m_end_tiles.at(m_end_tiles_count).y = coords.y;
         m_end_tiles_count++;
       } else if (tile.m_type == TileType::Road) {
+        if ((coords.x == m_start_tile.x) && (coords.y == m_start_tile.y))
+          m_reached_end = true;
+
         if (tile.has_road_connection(RoadConnections::Up) && (coords.y > 0))
           tiles_to_check.emplace(coords.x, coords.y - 1);
         if (tile.has_road_connection(RoadConnections::Down) &&

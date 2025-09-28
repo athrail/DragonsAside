@@ -38,6 +38,7 @@ struct State {
   Tile m_next_tile;
   uint8_t m_eq_count{0};
   bool m_game_over{false};
+  bool m_game_won{false};
 };
 
 void new_game(State &state) {
@@ -48,6 +49,7 @@ void new_game(State &state) {
                                   state.board.m_tile_height};
   state.m_next_tile.m_rect = drawn_tile_rect;
   state.m_game_over = false;
+  state.m_game_won = false;
   game_log.clear();
 }
 
@@ -126,7 +128,7 @@ void update(State &st) {
       } else {
         st.board.unselect();
       }
-    } else if (st.m_game_over) {
+    } else if (st.m_game_over || st.m_game_won) {
       return;
     } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
       if (event.button.button == SDL_BUTTON_LEFT) {
@@ -181,6 +183,14 @@ void update(State &st) {
     }
   }
 
+  if (board_changed) {
+    st.board.recalculate_end_tiles();
+    if (st.board.m_reached_end) {
+      st.m_game_won = true;
+      return;
+    }
+  }
+
   while (st.m_next_tile.m_type == TileType::Dragon) {
     uint8_t x = get_random();
     uint8_t y = 1 + get_random();
@@ -230,6 +240,9 @@ void update(State &st) {
     }
 
     st.board.recalculate_end_tiles();
+    if (st.board.m_reached_end)
+      st.m_game_won = true;
+
     st.board.recalculate_reachable_tiles();
 
     if (!st.board.can_reach_end())
@@ -327,8 +340,13 @@ int main() {
 
     state.board.render(state.renderer);
 
-    if (state.m_game_over) {
-      render_text(state.renderer, "Game Over! :(", state.font, 800, 400, white);
+    if (state.m_game_won) {
+      render_text(state.renderer, "Game Won! Contratulations!", state.font, 800,
+                  400, white);
+      render_text(state.renderer, "Press N to start new game", state.font, 800,
+                  430, white);
+    } else if (state.m_game_over) {
+      render_text(state.renderer, "Game Over!", state.font, 800, 400, white);
       render_text(state.renderer, "Press N to start new game", state.font, 800,
                   430, white);
     }
